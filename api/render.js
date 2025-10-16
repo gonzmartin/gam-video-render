@@ -1,3 +1,7 @@
+import fs from "fs";
+import path from "path";
+import ffmpeg from "fluent-ffmpeg";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
@@ -10,26 +14,53 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Faltan datos (audio o imágenes)" });
     }
 
-    // --- Enlace a tu flujo n8n real ---
-    const N8N_WEBHOOK = "https://n8n.srv824689.hstgr.cloud/form-test/4d46704a-029f-4daa-ac44-c0615513a0d7";
+    // 🧠 Crear carpeta temporal
+    const tempDir = "/tmp/render";
+    fs.mkdirSync(tempDir, { recursive: true });
 
-    // --- Enviar datos a n8n ---
-    const response = await fetch(N8N_WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audio, imagenes, formato }),
+    // 🎵 Guardar audio recibido (base64)
+    const audioPath = path.join(tempDir, "audio.mp3");
+    fs.writeFileSync(audioPath, Buffer.from(audio, "base64"));
+
+    // 🖼️ Crear lista de imágenes para ffmpeg
+    const listPath = path.join(tempDir, "list.txt");
+    const segmentDuration = 5; // segundos por imagen
+    const lines = imagenes
+      .map((img) => `file '${img.url}'\nduration ${segmentDuration}`)
+      .join("\n");
+    fs.writeFileSync(listPath, lines);
+
+    // 🎬 Generar video
+    const outputPath = path.join(tempDir, "output.mp4");
+
+    await new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(listPath)
+        .inputOptions(["-f concat", "-safe 0"])
+        .input(audioPath)
+        .outputOptions([
+          "-c:v libx264",
+          "-c:a aac",
+          "-shortest",
+          formato === "9:16"
+            ? "-vf scale=1080:1920"
+            : "-vf scale=1920:1080"
+        ])
+        .save(outputPath)
+        .on("end", resolve)
+        .on("error", reject);
     });
 
-    const data = await response.json();
+    // 📦 Leer y convertir a base64
+    const videoBase64 = fs.readFileSync(outputPath).toString("base64");
 
-    // --- Respuesta final ---
-    return res.status(200).json({
+    res.status(200).json({
       status: "ok",
-      mensaje: "Render enviado a n8n correctamente",
-      resultado: data
+      mensaje: "Render generado correctamente",
+      video_base64: videoBase64
     });
   } catch (error) {
-    console.error("Error en el proxy:", error);
-    return res.status(500).json({ error: error.message });
+    console.error("Error:", error);
+    res.status(500).json({ error: error.message });
   }
 }
