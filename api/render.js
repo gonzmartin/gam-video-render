@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
 import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+
+// Vincular binario de ffmpeg para Vercel
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -64,3 +68,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
+
