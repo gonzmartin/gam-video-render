@@ -1,11 +1,9 @@
 {
-  "version": 3,
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
+  "version": 2,
+  "builds": [
+    { "src": "api/render.js", "use": "@vercel/node" }
+  ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" }
+    { "src": "/api/render", "dest": "/api/render.js" }
   ]
 }
