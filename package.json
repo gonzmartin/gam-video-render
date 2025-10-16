@@ -1,11 +1,6 @@
 {
-  "name": "video-render",
-  "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "express": "^4.19.2",
-    "fluent-ffmpeg": "^2.1.2",
-    "node-fetch": "^3.3.2",
-    "cors": "^2.8.5"
+    "fluent-ffmpeg": "^2.1.2"
   }
 }
