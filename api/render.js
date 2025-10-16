@@ -14,18 +14,22 @@ export default async function handler(req, res) {
   try {
     const { audio, imagenes = [], formato = "9:16" } = req.body;
 
-    // 🧠 Extraer el audio (Base64 o con objeto)
+    // 🎧 1. Procesar audio Base64 (viene directo o dentro de un objeto)
     const audioBase64 =
       typeof audio === "object" && audio.data ? audio.data : audio;
+    if (!audioBase64) throw new Error("Audio no recibido o vacío");
+
     const audioBuffer = Buffer.from(audioBase64, "base64");
     const audioPath = path.join("/tmp", "audio.mp3");
     fs.writeFileSync(audioPath, audioBuffer);
+    console.log("✅ Audio guardado:", audioPath);
 
-    // 📸 Descargar imágenes localmente a /tmp
+    // 📸 2. Descargar imágenes temporalmente a /tmp
     const localImages = [];
     for (let i = 0; i < imagenes.length; i++) {
       const img = imagenes[i];
       const response = await fetch(img.url);
+      if (!response.ok) throw new Error(`Error al descargar imagen ${i}`);
       const buffer = await response.arrayBuffer();
       const localPath = path.join("/tmp", `img_${i}.jpg`);
       fs.writeFileSync(localPath, Buffer.from(buffer));
@@ -35,16 +39,26 @@ export default async function handler(req, res) {
       });
     }
 
-    // 🧾 Crear list.txt con las rutas locales
-    const listPath = path.join("/tmp", "list.txt");
-    const listContent = localImages
-      .map((img) => `file '${img.path}'\nduration ${img.duracion}`)
-      .join("\n");
-    fs.writeFileSync(listPath, listContent);
+    if (localImages.length === 0)
+      throw new Error("No se recibieron imágenes válidas");
 
+    // 🧾 3. Crear list.txt con formato concat correcto
+    const listPath = path.join("/tmp", "list.txt");
+    const listContent =
+      localImages
+        .map(
+          (img) =>
+            `file '${img.path.replace(/'/g, "'\\''")}'\nduration ${img.duracion}`
+        )
+        .join("\n") + "\n"; // ⚠️ línea vacía final obligatoria
+
+    fs.writeFileSync(listPath, listContent, "utf8");
+    console.log("✅ Archivo list.txt creado correctamente");
+    console.log(listContent);
+
+    // 🎬 4. Generar vídeo con ffmpeg
     const outputPath = path.join("/tmp", "video.mp4");
 
-    // 🎬 Renderizar vídeo
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
@@ -57,15 +71,19 @@ export default async function handler(req, res) {
             : "scale=1920:1080:force_original_aspect_ratio=decrease",
           "-shortest",
         ])
+        .on("start", (cmd) => console.log("🎥 ffmpeg cmd:", cmd))
         .on("end", resolve)
         .on("error", reject)
         .save(outputPath);
     });
 
+    console.log("✅ Render finalizado correctamente");
+
+    // 📦 5. Devolver resultado
     res.json({
       status: "ok",
       message: "🎬 Vídeo renderizado correctamente",
-      video_url: outputPath,
+      video_path: outputPath,
     });
   } catch (err) {
     console.error("❌ Error en render:", err);
