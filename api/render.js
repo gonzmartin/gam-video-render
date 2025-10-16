@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     }
 
     // --- Webhook de n8n (ajústalo con tu URL real) ---
-    const N8N_WEBHOOK = "https://tu-dominio-n8n.com/webhook/render-video";
+    const N8N_WEBHOOK = "https://n8n.srv824689.hstgr.cloud/form-test/4d46704a-029f-4daa-ac44-c0615513a0d7";
 
     // --- Enviar a n8n ---
     const response = await fetch(N8N_WEBHOOK, {
@@ -33,3 +33,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: error.message });
   }
 }
+
