@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import fetch from "node-fetch";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 
@@ -13,23 +14,37 @@ export default async function handler(req, res) {
   try {
     const { audio, imagenes = [], formato = "9:16" } = req.body;
 
-    // 🧠 Audio Base64 → archivo temporal
+    // 🧠 Extraer el audio (Base64 o con objeto)
     const audioBase64 =
       typeof audio === "object" && audio.data ? audio.data : audio;
     const audioBuffer = Buffer.from(audioBase64, "base64");
     const audioPath = path.join("/tmp", "audio.mp3");
     fs.writeFileSync(audioPath, audioBuffer);
 
-    // 📸 Crear lista temporal con las imágenes
+    // 📸 Descargar imágenes localmente a /tmp
+    const localImages = [];
+    for (let i = 0; i < imagenes.length; i++) {
+      const img = imagenes[i];
+      const response = await fetch(img.url);
+      const buffer = await response.arrayBuffer();
+      const localPath = path.join("/tmp", `img_${i}.jpg`);
+      fs.writeFileSync(localPath, Buffer.from(buffer));
+      localImages.push({
+        path: localPath,
+        duracion: img.fin - img.inicio,
+      });
+    }
+
+    // 🧾 Crear list.txt con las rutas locales
     const listPath = path.join("/tmp", "list.txt");
-    const listContent = imagenes
-      .map((img) => `file '${img.url}'\nduration ${img.fin - img.inicio}`)
+    const listContent = localImages
+      .map((img) => `file '${img.path}'\nduration ${img.duracion}`)
       .join("\n");
     fs.writeFileSync(listPath, listContent);
 
     const outputPath = path.join("/tmp", "video.mp4");
 
-    // 🎬 Generar vídeo con ffmpeg
+    // 🎬 Renderizar vídeo
     await new Promise((resolve, reject) => {
       ffmpeg()
         .input(listPath)
@@ -49,7 +64,7 @@ export default async function handler(req, res) {
 
     res.json({
       status: "ok",
-      message: "Vídeo renderizado correctamente",
+      message: "🎬 Vídeo renderizado correctamente",
       video_url: outputPath,
     });
   } catch (err) {
